@@ -3,11 +3,12 @@
 - sound
 - sleep
 - timer
+- ellipse: fix collision
+- line: (size | get/set position2(x,y) | get/set angle,length), alpha, collision
 - pivot
-- item.control_by(W, A, S, D)
 - collision: once
 - collision: bounce
-- bullet fire on angle
+- speed on angle (bullet fire)
 '''
 import pygame
 
@@ -90,21 +91,18 @@ keys = []
 pygame.init()
 font = pygame.font.SysFont(fontName, fontSize)
 
+def version():
+	return "0.2"
+
 def sum2d(a, b):
 	return (a[0] + b[0], a[1] + b[1])
 
 def inPoint(p, pos, size):
 	end = sum2d(pos, size)
-	if p[0] >= pos[0] and p[1] >= pos[1] and p[0] <= end[0] and p[1] <= end[1]:
-		return True
-	else:
-		return False
+	return p[0] >= pos[0] and p[1] >= pos[1] and p[0] <= end[0] and p[1] <= end[1]
 
 def inCollision(p1, s1, p2, s2): #####
-	if p1[0] < p2[0] + s2[0] and p1[0] + s1[0] > p2[0] and p1[1] < p2[1] + s2[1] and s1[1] + p1[1] > p2[1]:
-		return True
-	else:
-		return False
+	return p1[0] < p2[0] + s2[0] and p1[0] + s1[0] > p2[0] and p1[1] < p2[1] + s2[1] and s1[1] + p1[1] > p2[1]
 
 def roundedRect(surface, color, rect, radius):
     """
@@ -171,11 +169,24 @@ def remove(tag):
 			del room[i]
 		else:
 			i += 1
-def keyMap(char):
-	source = "ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890"
-	target = (pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e, pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j, pygame.K_k, pygame.K_l, pygame.K_m, pygame.K_n, pygame.K_o, pygame.K_p, pygame.K_q, pygame.K_r, pygame.K_s, pygame.K_t, pygame.K_u, pygame.K_v, pygame.K_w, pygame.K_x, pygame.K_y, pygame.K_z, pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0)
-	i = source.find(char)
-	return None if i < 0 or i >= len(target) else target[i]
+
+def keyMap(name):
+	if type(name) != str:
+		return name
+	name = name.lower()
+
+	if len(name) == 1: 
+		source = "_abcdefghijklmnopqrstuvwxyz01234567890+-*\\/.,`\t\n"
+		target = (None, pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e, pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j, pygame.K_k, pygame.K_l, pygame.K_m, pygame.K_n, pygame.K_o, pygame.K_p, pygame.K_q, pygame.K_r, pygame.K_s, pygame.K_t, pygame.K_u, pygame.K_v, pygame.K_w, pygame.K_x, pygame.K_y, pygame.K_z, pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0, pygame.K_PLUS, pygame.K_MINUS, pygame.K_ASTERISK, pygame.K_SLASH, pygame.K_BACKSLASH, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_BACKQUOTE, pygame.K_TAB, pygame.K_RETURN)
+		i = source.find(name.lower())
+		if i >= 0:
+			return target[i]
+	else:
+		d = {"left": pygame.K_LEFT, "right": pygame.K_RIGHT, "up": pygame.K_UP, "down": pygame.K_DOWN, "esc": pygame.K_ESCAPE, "escape": pygame.K_ESCAPE, "tab": pygame.K_TAB, "backspace": pygame.K_BACKSPACE, "enter": pygame.K_RETURN, "ins": pygame.K_INSERT, "insert": pygame.K_INSERT, "del": pygame.K_DELETE, "delete": pygame.K_DELETE, "home": pygame.K_HOME, "end": pygame.K_END, "pageup": pygame.K_PAGEUP, "pagedown": pygame.K_PAGEDOWN}
+		if name in d:
+			return d[name]
+
+	return None 
 	
 def mainloop(caption="game", color=SKY, width=800, height=600):
 	global screensize, done, screen, font, keys
@@ -264,6 +275,10 @@ class Box:
 				self.controlKeys = []
 				for ch in keys:
 					self.controlKeys.append(keyMap(ch))
+		elif type(keys) == tuple:
+			self.controlKeys = []
+			for key in keys:
+				self.controlKeys.append(keyMap(key))
 
 	def movement(self):
 		ctrlX = 0
