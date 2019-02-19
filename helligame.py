@@ -7,10 +7,9 @@
 - line: (size | get/set position2(x,y) | get/set angle,length), alpha, collision
 - pivot
 - collision: once
-- collision: bounce
 - speed on angle (bullet fire)
 '''
-import pygame
+import pygame, random, time, math
 
 WHITE = (255, 255, 255)
 SMOKE = (225, 224, 224)
@@ -82,6 +81,7 @@ start = None
 keyup = None
 keydown = None
 backColor = SKY
+sleep_sec = 0
 screensize = (800, 600)
 fps = 60
 fontName = "comicsansms"
@@ -92,10 +92,22 @@ pygame.init()
 font = pygame.font.SysFont(fontName, fontSize)
 
 def version():
-	return "0.2"
+	return "0.3"
 
 def sum2d(a, b):
 	return (a[0] + b[0], a[1] + b[1])
+
+def randomItem(items):
+	i = random.randint(0, len(items) - 1)
+	return items[i]
+
+def randomSign(n):
+	return randomItem((-1, 1)) * n
+
+def random2d(radius1, radius2=None):
+	a = random.random() * 2 * math.pi
+	r = radius1 if radius2==None else radius1 + (radius2 - radius1) * random.random()
+	return (r * math.sin(a), r * math.cos(a))
 
 def inPoint(p, pos, size):
 	end = sum2d(pos, size)
@@ -157,10 +169,11 @@ def quit():
 	done = True
 
 def sleep(seconds):
-	pass
+	global sleep_sec
+	sleep_sec += seconds
 
 def sound(filename):
-	pass
+	pygame.mixer.Sound(filename).play()
 
 def remove(tag):
 	i = 0
@@ -189,7 +202,7 @@ def keyMap(name):
 	return None 
 	
 def mainloop(caption="game", color=SKY, width=800, height=600):
-	global screensize, done, screen, font, keys
+	global screensize, done, screen, font, keys, sleep_sec
 	pygame.display.set_caption(caption)
 	screensize = (width, height)
 	screen = pygame.display.set_mode(screensize)
@@ -237,7 +250,11 @@ def mainloop(caption="game", color=SKY, width=800, height=600):
 
 		if frame != None: frame()
 		pygame.display.flip()
-		clock.tick(fps)
+		if sleep_sec > 0:
+			time.sleep(sleep_sec)
+			sleep_sec = 0
+		else:
+			clock.tick(fps)
 		
 	pygame.quit()
 
@@ -253,6 +270,7 @@ class Box:
 		self.click = None
 		self.collision = None
 		self.out = None
+		self.bounce=None
 		self.visible = True
 		self.enabled = True
 		self.pause = False
@@ -280,6 +298,12 @@ class Box:
 			for key in keys:
 				self.controlKeys.append(keyMap(key))
 
+	def turnX(self):
+		self.speed = (-self.speed[0], self.speed[1])
+
+	def turnY(self):
+		self.speed = (self.speed[0], -self.speed[1])
+
 	def movement(self):
 		ctrlX = 0
 		ctrlY = 0
@@ -297,10 +321,15 @@ class Box:
 		self.move(self.speed[0] + ctrlX, self.speed[1] + ctrlY)
 
 		if self.bound:
+			bounced = False
 			if self.position[0] + self.size[0] >= screensize[0] or self.position[0] <= 0:
-				self.speed = (-self.speed[0], self.speed[1])
+				self.turnX()
+				bounced = True
 			if self.position[1] + self.size[1] >= screensize[1] or self.position[1] <= 0:
-				self.speed = (self.speed[0], -self.speed[1])
+				self.turnY()
+				bounced = True
+			if bounced and self.bounce != None:
+				self.bounce()
 				
 	def isOut(self):
 		return self.position[0]+self.size[0]<0 or self.position[0]>screensize[0] or self.position[1]+self.size[1]<0 or self.position[1]>screensize[1]

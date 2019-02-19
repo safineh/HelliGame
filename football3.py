@@ -2,21 +2,27 @@ import helligame as game, random
 
 def ball_collision(item):
 	if item==bgoal:
+		game.sound("audio/fallsmall.ogg")
 		bscore.text += 1
 		randSpeed()
 	elif item==rgoal:
+		game.sound("audio/fallbig.ogg")
 		rscore.text += 1
 		randSpeed()
-		
+
 def randSpeed():
 	v=random.random() * 3
 	ball.speed=(game.randomSign(v + 5), game.randomSign(7 - v))
 	ball.position=(384, 264)
 
+def ball_bounce():
+	game.sound("audio/hit1.ogg")
+
 game.Image("images/stadium800.jpg")
 ball=game.Image("images/football.png", (384, 264))
 ball.moveBy("WASD", 10)
 ball.collision=ball_collision
+ball.bounce = ball_bounce
 randSpeed()
 
 rscore=game.Label(0, (10,0), color=game.RED)
