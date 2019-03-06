@@ -1,13 +1,16 @@
 '''
 * for implement:
-- sound
-- sleep
 - timer
+- mouse enter/exit
+- mouse down/up
+- collision: once
+- fade in/out
+- animation: like 1..2..3
+- speed on angle (bullet fire)
+- taget rather than speed
 - ellipse: fix collision
 - line: (size | get/set position2(x,y) | get/set angle,length), alpha, collision
 - pivot
-- collision: once
-- speed on angle (bullet fire)
 '''
 import pygame, random, time, math
 
@@ -92,7 +95,7 @@ pygame.init()
 font = pygame.font.SysFont(fontName, fontSize)
 
 def version():
-	return "0.3"
+	return "0.4"
 
 def sum2d(a, b):
 	return (a[0] + b[0], a[1] + b[1])
@@ -201,62 +204,81 @@ def keyMap(name):
 
 	return None 
 	
-def mainloop(caption="game", color=SKY, width=800, height=600):
-	global screensize, done, screen, font, keys, sleep_sec
+def init(caption="game", color=SKY, width=800, height=600):
+	global screensize, screen, done, clock, backColor
+	done=False
 	pygame.display.set_caption(caption)
 	screensize = (width, height)
 	screen = pygame.display.set_mode(screensize)
 	clock = pygame.time.Clock()
 	backColor = color
+
+def events(room):
+	global done, keys
+	for event in pygame.event.get():
+		if event.type == pygame.QUIT:
+			done = True
+		elif event.type == pygame.KEYDOWN:
+			keys.append(event.key)
+			if keydown != None: keydown(event.key)
+		elif event.type == pygame.KEYUP:
+			keys.remove(event.key)
+			if keyup != None: keyup(event.key)
+		elif event.type == pygame.MOUSEBUTTONDOWN:
+			if event.button == 1:
+				c = 0
+				for item in room:
+					if item.enabled and inPoint(event.pos, item.position, item.size):
+						c = c + 1
+						if item.click != None:
+							item.click(item)
+				if c == 0 and click != None:
+					click(event.pos)
+			else:
+				if other != None: other(event)
+		else:
+			if other != None: other(event) #####
+
+def update(room):
+	for item in room:
+		if not(pause) and not(item.pause) :
+			if item.movement != None: item.movement()
+
+			for item2 in room: #####
+				if item.collision!=None and not(item2.pause) and item!=item2 and inCollision(item.position, item.size, item2.position, item2.size):
+					item.collision(item2)
+
+def draw(room):
+	global backColor, sleep_sec, clock
 	
+	screen.fill(backColor)
+	for item in room:
+		if item.visible:
+			item.draw(screen)
+	pygame.display.flip()
+
+	if sleep_sec > 0:
+		time.sleep(sleep_sec)
+		sleep_sec = 0
+	else:
+		clock.tick(fps)
+
+def quit():
+	pygame.quit()
+
+def mainloop(caption="game", color=SKY, width=800, height=600):
+	global done
+
+	init(caption, color, width, height)
 	if start != None: start()
 
 	while not done:
-		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				done = True
-			elif event.type == pygame.KEYDOWN:
-				keys.append(event.key)
-				if keydown != None: keydown(event.key)
-			elif event.type == pygame.KEYUP:
-				keys.remove(event.key)
-				if keyup != None: keyup(event.key)
-			elif event.type == pygame.MOUSEBUTTONDOWN:
-				if event.button == 1:
-					for item in room:
-						c = 0
-						if item.enabled and inPoint(event.pos, item.position, item.size):
-							c = c + 1
-							if item.click != None:
-								item.click(item)
-					if c == 0 and click != None:
-						click(event.pos)
-				else:
-					if other != None: other(event)
-			else:
-				if other != None: other(event) #####
-
-		screen.fill(backColor)
-		for item in room:
-			if item.visible:
-				if not(pause) and not(item.pause) :
-					if item.movement != None: item.movement()
-
-					for item2 in room: #####
-						if item.collision!=None and not(item2.pause) and item!=item2 and inCollision(item.position, item.size, item2.position, item2.size):
-							item.collision(item2)
-
-				item.draw(screen)
-
+		events(room)
+		update(room)
+		draw(room)
 		if frame != None: frame()
-		pygame.display.flip()
-		if sleep_sec > 0:
-			time.sleep(sleep_sec)
-			sleep_sec = 0
-		else:
-			clock.tick(fps)
 		
-	pygame.quit()
+	quit()
 
 class Box:
 	def __init__(self, position=(0, 0), size=(1, 1), color=BLACK, speed=(0, 0), thick=0, radius=0, alpha=1, tag=""):
