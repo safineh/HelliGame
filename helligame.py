@@ -75,7 +75,9 @@ CHOCOLATE = (105, 58, 42)
 DARK_CHOCOLATE = (72, 51, 50)
 WHITE_CHOCOLATE = (234, 225, 201)
 
+inited = False
 done = False
+breaked = False
 pause = False
 frame = None
 click = None
@@ -167,10 +169,6 @@ def screenshot(filename):
 	global screen
 	pygame.image.save(screen, filename)
 	
-def quit():
-	global done
-	done = True
-
 def sleep(seconds):
 	global sleep_sec
 	sleep_sec += seconds
@@ -192,8 +190,8 @@ def keyMap(name):
 	name = name.lower()
 
 	if len(name) == 1: 
-		source = "_abcdefghijklmnopqrstuvwxyz01234567890+-*\\/.,`\t\n"
-		target = (None, pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e, pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j, pygame.K_k, pygame.K_l, pygame.K_m, pygame.K_n, pygame.K_o, pygame.K_p, pygame.K_q, pygame.K_r, pygame.K_s, pygame.K_t, pygame.K_u, pygame.K_v, pygame.K_w, pygame.K_x, pygame.K_y, pygame.K_z, pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0, pygame.K_PLUS, pygame.K_MINUS, pygame.K_ASTERISK, pygame.K_SLASH, pygame.K_BACKSLASH, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_BACKQUOTE, pygame.K_TAB, pygame.K_RETURN)
+		source = "_ abcdefghijklmnopqrstuvwxyz01234567890+-*\\/.,`\t\n"
+		target = (None, pygame.K_SPACE, pygame.K_a, pygame.K_b, pygame.K_c, pygame.K_d, pygame.K_e, pygame.K_f, pygame.K_g, pygame.K_h, pygame.K_i, pygame.K_j, pygame.K_k, pygame.K_l, pygame.K_m, pygame.K_n, pygame.K_o, pygame.K_p, pygame.K_q, pygame.K_r, pygame.K_s, pygame.K_t, pygame.K_u, pygame.K_v, pygame.K_w, pygame.K_x, pygame.K_y, pygame.K_z, pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0, pygame.K_PLUS, pygame.K_MINUS, pygame.K_ASTERISK, pygame.K_SLASH, pygame.K_BACKSLASH, pygame.K_PERIOD, pygame.K_COMMA, pygame.K_BACKQUOTE, pygame.K_TAB, pygame.K_RETURN)
 		i = source.find(name.lower())
 		if i >= 0:
 			return target[i]
@@ -205,13 +203,14 @@ def keyMap(name):
 	return None 
 	
 def init(caption="game", color=SKY, width=800, height=600):
-	global screensize, screen, done, clock, backColor
+	global screensize, screen, done, clock, backColor, inited
 	done=False
 	pygame.display.set_caption(caption)
 	screensize = (width, height)
 	screen = pygame.display.set_mode(screensize)
 	clock = pygame.time.Clock()
 	backColor = color
+	inited = True
 
 def events(room):
 	global done, keys
@@ -225,28 +224,45 @@ def events(room):
 			keys.remove(event.key)
 			if keyup != None: keyup(event.key)
 		elif event.type == pygame.MOUSEBUTTONDOWN:
-			if event.button == 1:
-				c = 0
-				for item in room:
-					if item.enabled and inPoint(event.pos, item.position, item.size):
-						c = c + 1
-						if item.click != None:
+			for item in room:
+				if item.underPoint(event.pos):
+					if item.mouseDown != None:
+						item.mouseDown(item)
+					if event.button == 1 and item.enabled and item.click != None:
+						if item.detailed:
 							item.click(item)
-				if c == 0 and click != None:
-					click(event.pos)
-			else:
-				if other != None: other(event)
+						else:
+							item.click()
+			if click != None:
+				click(event.pos)
+		elif event.type == pygame.MOUSEBUTTONUP:
+			for item in room:
+				if item.underPoint(event.pos):
+					if item.mouseUp != None:
+						item.mouseUp(item)
 		else:
 			if other != None: other(event) #####
 
 def update(room):
 	for item in room:
-		if not(pause) and not(item.pause) :
-			if item.movement != None: item.movement()
+		for tmr in item.timers:
+			if tmr.done() and tmr.function != None:
+				if tmr.detailed:
+					tmr.function(item, tmr)
+				else:
+					tmr.function()
 
-			for item2 in room: #####
-				if item.collision!=None and not(item2.pause) and item!=item2 and inCollision(item.position, item.size, item2.position, item2.size):
-					item.collision(item2)
+	if not(pause):
+		for item in room:
+			if not(item.pause):
+				if item.movement != None: item.movement()
+
+				for item2 in room: #####
+					if item.collision!=None and not(item2.pause) and item!=item2 and inCollision(item.position, item.size, item2.position, item2.size):
+						if item.detailed:
+							item.collision(item, item2)
+						else:
+							item.collision(item2)
 
 def draw(room):
 	global backColor, sleep_sec, clock
@@ -263,42 +279,101 @@ def draw(room):
 	else:
 		clock.tick(fps)
 
+def mousePosition():
+	return pygame.mouse.get_pos()
+
+def mouseButtons():
+	return pygame.mouse.get_pressed()
+
+def back():
+	global breaked
+	breaked = True
+
 def quit():
-	pygame.quit()
-
-def mainloop(caption="game", color=SKY, width=800, height=600):
 	global done
+	done = True
+	pygame.quit()
+		
+def mainloop(caption="game", color=SKY, width=800, height=600, room=room):
+	global done, frame, inited, breaked
 
-	init(caption, color, width, height)
+	window = not(inited)
+	if (window): init(caption, color, width, height)
 	if start != None: start()
 
-	while not done:
+	while not done or breaked:
+		breaked = False
 		events(room)
 		update(room)
+		if done or breaked:
+			breaked = False
+			break
+			
 		draw(room)
 		if frame != None: frame()
+
+	if (window and done): quit()
+
+class Timer:
+	def __init__(self, sec, autorestart=False):
+		self.__check = time.time()
+		self.sec = sec
+		self.remain = sec
+		self.__pause = False
+		self.autorestart = autorestart
 		
-	quit()
+	def __update(self):
+		if not(self.__pause):
+			self.remain -= time.time() - self.__check
+			if self.remain < 0:
+				self.remain = 0
+				self.__pause = True
+		self.__check = time.time()
+		
+	def Pause(self, value = True):
+		self.__pause = value
+		self.__update()
+
+	def working(self):
+		return not(self.__pause) and self.remain > 0
+
+	def done(self):
+		working = self.working()
+		self.__update()
+		ret = working and self.remain <= 0
+		if self.autorestart and ret: self.restart()
+		return ret
+
+	def restart(self):
+		self.remain = self.sec
+		self.__pause = False
 
 class Box:
-	def __init__(self, position=(0, 0), size=(1, 1), color=BLACK, speed=(0, 0), thick=0, radius=0, alpha=1, tag=""):
-		self.tag = tag
+	def __init__(self, position=(0, 0), size=(1, 1), color=BLACK, speed=(0, 0), thick=0, radius=0, alpha=1, tag="", detailed=False, visible=True, enabled=True, pause=False, bound=True):
 		self.position = position
 		self.size = size
 		self.thick = thick
 		self.radius = radius
 		self.speed = speed
 		self.color = (color[0], color[1], color[2], int(alpha * 255))
+		self.tag = tag
+		self.detailed = detailed
+		self.visible = visible
+		self.enabled = enabled
+		self.pause = pause
+		self.bound = bound
+		self.controlKeys = None
+		self.controlSpeed = 0
+		self.timers = []
+
+		#events
 		self.click = None
+		self.mouseDown = None
+		self.mouseUp = None
 		self.collision = None
 		self.out = None
-		self.bounce=None
-		self.visible = True
-		self.enabled = True
-		self.pause = False
-		self.bound=True
-		self.controlKeys=None
-		self.controlSpeed=0
+		self.bounce= None
+
 		room.append(self)
 	
 	def draw(self, screen):
@@ -319,6 +394,12 @@ class Box:
 			self.controlKeys = []
 			for key in keys:
 				self.controlKeys.append(keyMap(key))
+
+	def underPoint(self, point):
+		return self.visible and inPoint(point, self.position, self.size)
+
+	def underMouse(self, point):
+		return underPoint(MOUSE_POINT)
 
 	def turnX(self):
 		self.speed = (-self.speed[0], self.speed[1])
@@ -373,7 +454,13 @@ class Box:
 			self.position = (x, y)
 			if self.isOut():
 				self.out(self)
-				
+
+	def show(self):
+		self.visible = True
+
+	def hide(self):
+		self.visible = False
+
 	def sizeX(self, r):
 		self.size = (r * self.size[0], r * self.size[1])
 
@@ -386,28 +473,53 @@ class Box:
 	def speedAdd(self, x, y):
 		self.speed = (x + self.speed[0], y + self.speed[1])
 
+	def addTimer(self, time, function = None, detailed = False, autorestart=True, tag = ""):
+		tmr = Timer(time, autorestart)
+		tmr.function = function
+		tmr.detailed = detailed
+		tmr.tag = tag
+		self.timers.append(tmr)
+		return tmr
+
 class Ellipse(Box):
 	def draw(self, screen):
 		area = (self.position[0], self.position[1], self.size[0], self.size[1])
 		pygame.draw.ellipse(screen, self.color, area, self.thick)
 
 class Image(Box):
-	def __init__(self, image="", position=(0, 0), speed=(0, 0), tag=""):
-		Box.__init__(self, position=position, speed=speed, tag=tag)
-		self.load(image)
+	def __init__(self, images="", position=(0, 0), speed=(0, 0), tag="", detailed=False, visible=True, enabled=True, pause=False, bound=True, index=0):
+		Box.__init__(self, position=position, speed=speed, tag=tag, detailed=detailed, visible=visible, enabled=enabled, pause=pause, bound=bound)
+		self.images=images
+		self.index=index
+		self.repeat=None
+		self.load()
 
-	def load(self, image):
-		self.image = pygame.image.load(image)
+	def load(self, images=None, index=None):
+		images = self.images if images==None else images
+		index = self.index if index==None else index
+		filename = images if type(images) == str else images[index]
+		self.image = pygame.image.load(filename)
 		self.size = self.image.get_size()
-
-
+	
+	def next(self, step=1):
+		if type(self.images) == str: return
+		self.index += step
+		if self.index >= len(self.images):
+			self.index = self.index % len(self.images)
+			if self.repeat != None:
+				if detailed:
+					self.repeat(self)
+				else:
+					self.repeat()
+		self.load()
+		
 	def draw(self, screen):
 		screen.blit(self.image, self.position)
 
 class Label(Box):
-	def __init__(self, text="", position=(0, 0), color=WHITE, back=None, sysFont=None, size=None, thick=0, radius=0, alpha=1, tag=""):
+	def __init__(self, text="", position=(0, 0), color=WHITE, back=None, sysFont=None, size=None, thick=0, radius=0, alpha=1, tag="", format="", speed=(0,0), detailed=False, visible=True, enabled=True, pause=False, bound=True):
 		global font, fontName, fontSize
-		Box.__init__(self, position=position, color=color, thick=thick, tag=tag)
+		Box.__init__(self, position=position, speed=speed, color=color, thick=thick, tag=tag, detailed=detailed, visible=visible, enabled=enabled, pause=pause, bound=bound)
 		self.text = text
 		self.back = None if back==None else (back[0], back[1], back[2], int(alpha*255))
 		self.radius = radius
@@ -417,7 +529,7 @@ class Label(Box):
 			if sysFont == None: sysFont = fontName
 			if size == None: size = fontSize
 			self.font = pygame.font.SysFont(sysFont, size)
-		self.format = ""
+		self.format = format
 	
 	def draw(self, screen):
 		v = self.text
